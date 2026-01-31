@@ -130,8 +130,7 @@ func waitForHTTP200(ctx context.Context, url string) error {
 }
 
 func runApp(ctx context.Context, env map[string]string) error {
-	// This assumes the S3 demo program is the package in ./lambda
-	cmd := exec.CommandContext(ctx, "go", "run", "./lambda")
+	cmd := exec.CommandContext(ctx, "go", "run", "./lambda/checkererer")
 
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
