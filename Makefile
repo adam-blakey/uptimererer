@@ -1,11 +1,34 @@
-APP_NAME = s3-workflow
-STACK_NAME = s3-workflow-stack
+APP_NAME = uptimererer
+STACK_NAME = uptimererer-stack
 REGION = us-east-1
 
-deploy-localstack:
-	go run ./cmd/deploy -target localstack -region $(REGION) -bucket test
+# CDK deployment commands
+install-cdk:
+	npm install
 
-deploy-aws:
-	go run ./cmd/deploy -target aws -region $(REGION) -bucket my-real-bucket-name
+build-lambda:
+	cd lambda/checkererer && GOOS=linux GOARCH=amd64 go build -o main main.go
 
-.PHONY: deploy-localstack deploy-aws
+deploy-localstack: install-cdk build-lambda
+	npm run deploy-localstack
+
+deploy-aws: install-cdk build-lambda
+	npm run deploy-aws
+
+destroy-localstack: install-cdk
+	npm run destroy-localstack
+
+destroy-aws: install-cdk
+	npm run destroy-aws
+
+diff-localstack: install-cdk
+	npx cdk diff --context environment=localstack
+
+diff-aws: install-cdk
+	npx cdk diff --context environment=aws
+
+synth-localstack: install-cdk
+	npx cdk synth --context environment=localstack
+
+synth-aws: install-cdk
+	npx cdk synth --context environment=aws

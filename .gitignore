@@ -27,3 +27,25 @@ go.work.sum
 
 # Data
 volume/
+
+# CDK
+cdk.out/
+.cdk.staging/
+deploy/
+
+# Node.js
+node_modules/
+*.js
+*.d.ts
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.eslintcache
+
+# Environment
+.env
+.env.test
+
+# DynamoDB Local
+.dynamodb/
