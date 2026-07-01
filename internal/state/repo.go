@@ -65,8 +65,7 @@ func (r *Repo) PutIfUnchanged(ctx context.Context, rec Record, prevLastCheckedAt
 	}
 
 	if _, err := r.db.PutItem(ctx, in); err != nil {
-		var cond *types.ConditionalCheckFailedException
-		if errors.As(err, &cond) {
+		if _, ok := errors.AsType[*types.ConditionalCheckFailedException](err); ok {
 			return ErrStale
 		}
 		return fmt.Errorf("put %s: %w", rec.SiteID, err)

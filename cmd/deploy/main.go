@@ -146,8 +146,7 @@ func ensureRole(ctx context.Context, c *iam.Client) (string, error) {
 		log.Printf("created role %s", roleName)
 		return *out.Role.Arn, nil
 	}
-	var exists *iamtypes.EntityAlreadyExistsException
-	if !errors.As(err, &exists) {
+	if _, ok := errors.AsType[*iamtypes.EntityAlreadyExistsException](err); !ok {
 		return "", fmt.Errorf("create role: %w", err)
 	}
 	got, err := c.GetRole(ctx, &iam.GetRoleInput{RoleName: aws.String(roleName)})
