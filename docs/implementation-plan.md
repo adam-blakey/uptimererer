@@ -3,9 +3,14 @@
 Uptimererer is a serverless uptime checker: it periodically probes a configurable
 list of websites over HTTP/HTTPS, tracks their up/down state, and emails
 subscribers when a site goes offline or recovers. This plan implements the
-architecture in [architecture-diagram.png](architecture-diagram.png) as a Go
-monorepo, deployed with the AWS CDK to either real AWS or a local
-[Floci](https://floci.io/) emulator.
+architecture in [architecture-diagram.png](architecture-diagram.png) as a Java
+(Maven multi-module) monorepo, deployed with the AWS CDK to either real AWS or a
+local [Floci](https://floci.io/) emulator.
+
+> **Status:** the checker Lambda is implemented in Java 21. The other Lambdas
+> and the CDK app are not built yet; the checker stack is currently stood up on
+> the emulator by the `deploy` CLI (see the [README](../README.md)) rather than
+> CDK. The sections below describe the intended end state.
 
 ## 1. Architecture recap
 
@@ -33,47 +38,51 @@ Interpretation notes on the diagram:
 
 ## 2. Repository layout
 
-Monorepo, single Go module, one application per subfolder under `apps/`:
+Maven multi-module reactor, one deployable module per Lambda plus a shared
+`core` library:
 
 ```
 uptimererer/
-├── go.mod                       # single module: github.com/adamblakey/uptimererer
+├── pom.xml                      # parent (reactor): shared versions + plugins
 ├── Makefile                     # build, test, deploy-local, deploy-aws
 ├── docker-compose.yml           # Floci emulator
-├── apps/
-│   ├── dispatcher/main.go       # Lambda 1: decides requests to make
-│   ├── checker/main.go          # Lambda 2: makes network requests
-│   └── notifier/main.go         # Lambda 3: DDB stream -> SNS
-├── internal/
-│   ├── awsconf/                 # SDK config helper (honours AWS_ENDPOINT_URL for Floci)
-│   ├── sites/                   # SSM config model: load, parse, validate
-│   ├── probe/                   # HTTP/HTTPS check logic (pure, unit-testable)
-│   ├── state/                   # DynamoDB repository for site state
-│   └── events/                  # shared event types (CheckRequested, etc.)
-├── infra/                       # CDK app (Go)
-│   ├── cdk.json
-│   └── uptimererer.go           # stack definition
-├── dist/                        # build output: dist/<app>/bootstrap + .zip (gitignored)
+├── core/                        # shared library used by every Lambda
+│   └── src/main/java/com/adamblakey/uptimererer/
+│       ├── events/              # shared event types (CheckRequested, SiteConfig)
+│       ├── probe/               # HTTP/HTTPS check logic (pure, unit-testable)
+│       ├── state/               # DynamoDB repository + transition rules
+│       └── json/                # shared Jackson configuration
+├── dispatcher/                  # Lambda 1: decides requests to make (planned)
+├── checker/                     # Lambda 2: makes network requests → shaded jar
+├── notifier/                    # Lambda 3: DDB stream -> SNS (planned)
+├── deploy/                      # CLI that provisions the stack on the emulator
+├── infra/                       # CDK app (planned)
 └── docs/
     ├── architecture-diagram.png
     └── implementation-plan.md
 ```
 
-Why a single Go module rather than `go.work` multi-module: the apps share
-`internal/` packages heavily and are versioned/deployed together; one module
-keeps imports and tooling trivial. Revisit only if an app needs independent
-dependency versions.
+Why a Maven reactor rather than one flat module: each Lambda is packaged and
+deployed independently (as its own shaded jar), while all of them share the
+`core` contracts. The reactor builds them together and keeps the shared code in
+one place; `core` carries no Lambda-runtime dependencies so it stays cheap to
+reuse and unit-test.
 
 ## 3. Technology choices
 
-- **Go 1.24+** for all three Lambdas and the CDK app (single-language repo).
-- **AWS SDK for Go v2** — natively honours `AWS_ENDPOINT_URL`, which is how the
+- **Java 21** for all three Lambdas and the CDK app (single-language repo).
+- **AWS SDK for Java v2** — natively honours `AWS_ENDPOINT_URL`, which is how the
   Lambdas find Floci's services when running locally, with zero code branching.
-- **Lambda runtime `provided.al2023`, arm64**, handler binary named
-  `bootstrap`, built with `GOOS=linux GOARCH=arm64 CGO_ENABLED=0`.
-- **CDK v2 in Go** (`aws-cdk-lib` Go bindings). Lambda code is shipped as
-  prebuilt zips from `dist/` via `lambda.Code.FromAsset` — no Docker bundling,
-  which keeps `cdklocal` deploys to Floci fast and reliable.
+  Clients pin the URL-connection HTTP client for lean, deterministic startup.
+- **Lambda runtime `java21`**, handler
+  `com.adamblakey.uptimererer.checker.CheckerHandler::handleRequest`, packaged as
+  a shaded ("uber") jar via the Maven Shade plugin. The jar is
+  architecture-independent, so the same artifact runs on x86_64 or Graviton.
+- **`java.net.http.HttpClient`** for the probe — no third-party HTTP dependency;
+  it validates TLS and caps redirects out of the box.
+- **CDK v2 in Java** (`software.amazon.awscdk` bindings). Lambda code is shipped
+  as the prebuilt shaded jars via `Code.fromAsset` — no Docker bundling, which
+  keeps `cdklocal` deploys to Floci fast and reliable.
 - **Floci** for local runs: LocalStack-compatible emulator on
   `http://localhost:4566`, accepts dummy credentials, deployed to with
   `cdklocal` (the `aws-cdk-local` npm wrapper).
@@ -131,7 +140,7 @@ status, timestamp, and last error/HTTP status.
 
 ## 5. Application specs
 
-### 5.1 Dispatcher (`apps/dispatcher`)
+### 5.1 Dispatcher (`dispatcher`)
 
 Trigger: SQS event source mapping on the tick queue (batch size 1).
 
@@ -147,7 +156,7 @@ Trigger: SQS event source mapping on the tick queue (batch size 1).
 Duplicate ticks are harmless: checks are idempotent reads and the state
 machine in the checker tolerates repeated results.
 
-### 5.2 Checker (`apps/checker`)
+### 5.2 Checker (`checker`)
 
 Trigger: EventBridge rule on the bus (`source = uptimererer.dispatcher`,
 `detail-type = CheckRequested`), async invocation with retries=2 and a DLQ.
@@ -163,11 +172,12 @@ Trigger: EventBridge rule on the bus (`source = uptimererer.dispatcher`,
 3. Write the item with a conditional expression on `lastCheckedAt` so a stale
    overlapping invocation can't clobber a newer result.
 
-The probe logic lives in `internal/probe` as a pure function
-(`Probe(ctx, SiteConfig) CheckResult`) so it's unit-testable with `httptest`
-servers — including TLS failure, timeout, redirect, and wrong-status cases.
+The probe logic lives in `core` (`probe` package) as a pure method
+(`Probe.check(SiteConfig) → ProbeResult`) so it's unit-testable against an
+in-JVM `com.sun.net.httpserver` server — including TLS failure, timeout,
+redirect, and wrong-status cases.
 
-### 5.3 Notifier (`apps/notifier`)
+### 5.3 Notifier (`notifier`)
 
 Trigger: DynamoDB Streams event source mapping (batch size 10, retry with
 bisect-on-error).
@@ -190,14 +200,14 @@ One stack, `UptimerererStack`, containing (roughly in dependency order):
 5. Custom EventBridge bus + rule targeting the checker.
 6. Scheduled rule `rate(1 minute)` on the *default* bus targeting the tick
    queue.
-7. Three Lambda functions from `dist/*.zip` with least-privilege grants:
-   dispatcher (SSM read, DDB read, `events:PutEvents` on the bus), checker
-   (DDB read/write), notifier (stream read, `sns:Publish`).
+7. Three Lambda functions from the shaded jars (`*/target/*.jar`) with
+   least-privilege grants: dispatcher (SSM read, DDB read, `events:PutEvents` on
+   the bus), checker (DDB read/write), notifier (stream read, `sns:Publish`).
 8. Stack outputs: table name, bus name, topic ARN — consumed by smoke tests.
 
 Environment-specific values (table name, bus name, topic ARN, parameter name)
 are passed to the Lambdas as environment variables by CDK; nothing is
-hardcoded in Go.
+hardcoded in Java.
 
 ## 7. Local development with Floci
 
@@ -206,9 +216,12 @@ Local flow:
 
 ```sh
 make local-up        # docker compose up -d floci
-make deploy-local    # builds zips, then: cdklocal bootstrap && cdklocal deploy
+make deploy-local    # builds the jars, then: cdklocal bootstrap && cdklocal deploy
 make local-logs      # tail emulated Lambda logs
 ```
+
+(Until the CDK app exists, `make deploy-local` provisions the checker stack via
+the `deploy` CLI instead — see the [README](../README.md).)
 
 `deploy-local` exports the standard dummy environment first:
 
@@ -223,8 +236,7 @@ Key points:
 - `cdklocal` (npm `aws-cdk-local`) is the only extra tool vs. real AWS; the
   CDK app itself is identical for both targets.
 - Inside emulated Lambdas the SDK picks up the emulator endpoint via
-  `AWS_ENDPOINT_URL`; `internal/awsconf` exists only to centralise SDK config
-  loading, not to special-case Floci.
+  `AWS_ENDPOINT_URL`; the Java code has no local/AWS branching.
 - Email doesn't actually send locally. For local verification, `cdk.json`
   context flag `localTest=true` additionally subscribes an SQS queue to the
   SNS topic so tests (and humans) can assert that alerts fired.
@@ -237,14 +249,14 @@ make deploy-aws      # builds zips, then: cdk deploy -c alertEmail=...
 
 Prereqs: bootstrapped account/region (`cdk bootstrap`), credentials via the
 usual chain. The email subscription requires one manual confirmation click on
-first deploy. CI note: `make build test` on every push; deploys stay manual
-until the project stabilises.
+first deploy. CI note: `make build && make test` on every push; deploys stay
+manual until the project stabilises.
 
 ## 9. Testing strategy
 
-1. **Unit tests** (pure Go, no emulator): `internal/probe` against `httptest`
-   servers; state-transition table tests for the checker's rules; SSM config
-   parsing/validation; notifier transition detection on synthetic stream
+1. **Unit tests** (pure JUnit 5, no emulator): the `probe` package against an
+   in-JVM HTTP server; state-transition table tests for the checker's rules; SSM
+   config parsing/validation; notifier transition detection on synthetic stream
    records.
 2. **Infra assertions**: CDK `assertions` snapshot/fine-grained tests on the
    synthesized template (right triggers, grants, env vars).
@@ -260,8 +272,8 @@ until the project stabilises.
 
 | # | Deliverable | Done when |
 |---|-------------|-----------|
-| M1 | Scaffolding: go.mod, Makefile, docker-compose, CI running `go build ./... && go test ./...` | `make build` produces three `dist/*.zip` |
-| M2 | `internal/` packages: probe, sites, state, events, awsconf — with unit tests | `make test` green |
+| M1 | Scaffolding: Maven reactor, Makefile, docker-compose, CI running `mvn verify` | `make build` produces the Lambda shaded jars |
+| M2 | `core` packages: probe, sites, state, events — with unit tests | `make test` green |
 | M3 | CDK stack + all three Lambdas wired, deployable to Floci | `make deploy-local` succeeds; manual tick → state appears in DynamoDB |
 | M4 | Notifications: notifier + SNS + local test queue | e2e test passes locally (down + recovery emails observed) |
 | M5 | AWS deploy: bootstrap, deploy, real email received | Smoke test green in a real account |
