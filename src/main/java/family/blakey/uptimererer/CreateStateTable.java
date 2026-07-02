@@ -41,12 +41,15 @@ public class CreateStateTable {
     }
 
     private CreateTableRequest getCreateTableRequest() {
+        var metadata = StateRecord.TABLE_SCHEMA.tableMetadata();
+        var partitionKey = metadata.primaryPartitionKey();
+
         var attributeDefinitionsBuilder = AttributeDefinition.builder()
-                .attributeName("websiteId")
-                .attributeType(ScalarAttributeType.S);
+                .attributeName(partitionKey)
+                .attributeType(metadata.scalarAttributeType(partitionKey).orElseThrow());
 
         var keySchemaBuilder = KeySchemaElement.builder()
-                .attributeName("websiteId")
+                .attributeName(partitionKey)
                 .keyType(KeyType.HASH);
 
         var builder = CreateTableRequest.builder()
