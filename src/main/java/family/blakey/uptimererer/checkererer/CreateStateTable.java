@@ -8,7 +8,7 @@ import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
-import software.amazon.awssdk.services.dynamodb.model.*;
+import software.amazon.awssdk.services.dynamodb.model.ResourceInUseException;
 
 /**
  * Creates the state table at startup, because the local emulator starts empty. Only enabled in
@@ -32,32 +32,10 @@ public class CreateStateTable {
       return;
     }
     try {
-      db.createTable(getCreateTableRequest());
+      db.createTable(StateRecord.createTableRequest(table));
       db.waiter().waitUntilTableExists(r -> r.tableName(table));
     } catch (ResourceInUseException alreadyExists) {
       // the table survives from an earlier run of this emulator
     }
-  }
-
-  private CreateTableRequest getCreateTableRequest() {
-    var metadata = StateRecord.TABLE_SCHEMA.tableMetadata();
-    var partitionKey = metadata.primaryPartitionKey();
-
-    var attributeDefinitionsBuilder =
-        AttributeDefinition.builder()
-            .attributeName(partitionKey)
-            .attributeType(metadata.scalarAttributeType(partitionKey).orElseThrow());
-
-    var keySchemaBuilder =
-        KeySchemaElement.builder().attributeName(partitionKey).keyType(KeyType.HASH);
-
-    var builder =
-        CreateTableRequest.builder()
-            .tableName(table)
-            .billingMode(BillingMode.PAY_PER_REQUEST)
-            .attributeDefinitions(attributeDefinitionsBuilder.build())
-            .keySchema(keySchemaBuilder.build());
-
-    return builder.build();
   }
 }
