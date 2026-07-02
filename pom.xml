@@ -14,6 +14,7 @@
         <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
         <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
         <quarkus.platform.version>3.37.1</quarkus.platform.version>
+        <quarkus-amazon-services.version>3.20.0</quarkus-amazon-services.version>
         <skipITs>true</skipITs>
         <surefire-plugin.version>3.5.6</surefire-plugin.version>
     </properties>
@@ -24,6 +25,13 @@
                 <groupId>${quarkus.platform.group-id}</groupId>
                 <artifactId>${quarkus.platform.artifact-id}</artifactId>
                 <version>${quarkus.platform.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>io.quarkiverse.amazonservices</groupId>
+                <artifactId>quarkus-amazon-services-bom</artifactId>
+                <version>${quarkus-amazon-services.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -38,6 +46,14 @@
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-rest</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkiverse.amazonservices</groupId>
+            <artifactId>quarkus-amazon-dynamodb</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>url-connection-client</artifactId>
         </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
