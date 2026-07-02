@@ -6,7 +6,8 @@ ifeq ($(shell test "$(JAVA_MAJOR)" -ge 24 2>/dev/null && echo yes),yes)
   export MAVEN_OPTS := $(MAVEN_OPTS) --sun-misc-unsafe-memory-access=allow
 endif
 
-.PHONY: deploy-floci deploy-localstack emulator-floci emulator-localstack dev local-down test
+.PHONY: build dev dev-floci dev-localstack deploy deploy-floci deploy-localstack \
+	send state emulator-floci emulator-localstack local-down test
 
 # Ensures the emulator service $(1) is the one serving :4566: reuses a running
 # container with a matching image (however it was started), otherwise stops
@@ -28,9 +29,38 @@ define ensure-emulator
 	done
 endef
 
-deploy-floci: emulator-floci dev
+# --- Deploy: build function.zip and provision it (with table + queue) in the emulator.
 
-deploy-localstack: emulator-localstack dev
+deploy-floci: emulator-floci deploy
+
+deploy-localstack: emulator-localstack deploy
+
+deploy:
+	./mvnw -q package -DskipTests exec:java -Dexec.args="deploy"
+
+# Queue a check request for URL, e.g. make send URL=https://example.com
+send:
+	@test -n "$(URL)" || { echo "usage: make send URL=https://example.com" >&2; exit 1; }
+	./mvnw -q compile exec:java -Dexec.args="send -url $(URL)"
+
+# Print all site state records from DynamoDB.
+state:
+	./mvnw -q compile exec:java -Dexec.args="state"
+
+# --- Dev mode: hot reload; SQS events go to the mock event server on :8082,
+#     not to the emulator's queue.
+
+dev-floci: emulator-floci dev
+
+dev-localstack: emulator-localstack dev
+
+dev:
+	./mvnw quarkus:dev
+
+# --- Plumbing.
+
+build:
+	./mvnw -q package -DskipTests
 
 emulator-floci:
 	$(call ensure-emulator,floci)
@@ -38,11 +68,9 @@ emulator-floci:
 emulator-localstack:
 	$(call ensure-emulator,localstack)
 
-dev:
-	./mvnw quarkus:dev
-
 local-down:
 	docker compose down
 
+# Tests talk to DynamoDB on :4566, so an emulator must be up (make emulator-floci).
 test:
 	./mvnw test

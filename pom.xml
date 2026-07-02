@@ -59,6 +59,23 @@
             <groupId>software.amazon.awssdk</groupId>
             <artifactId>url-connection-client</artifactId>
         </dependency>
+        <!-- Used only by the deploy CLI (DeployTool), which runs via exec:java on the compile
+             classpath; provided scope keeps these clients out of the Lambda function.zip. -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>sqs</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>iam</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>lambda</artifactId>
+            <scope>provided</scope>
+        </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-amazon-lambda</artifactId>
@@ -131,6 +148,18 @@
                         <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
                         <maven.home>${maven.home}</maven.home>
                     </systemPropertyVariables>
+                </configuration>
+            </plugin>
+            <!-- Runs the local deploy CLI: ./mvnw compile exec:java -Dexec.args="deploy" -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.6.3</version>
+                <configuration>
+                    <mainClass>family.blakey.uptimererer.deploy.DeployTool</mainClass>
+                    <!-- "compile" (not the default "runtime") so the provided-scope SDK clients
+                         above are on the classpath. -->
+                    <classpathScope>compile</classpathScope>
                 </configuration>
             </plugin>
             <plugin>
