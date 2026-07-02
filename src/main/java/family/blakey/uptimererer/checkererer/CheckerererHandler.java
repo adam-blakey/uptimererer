@@ -35,7 +35,8 @@ public class CheckerererHandler implements RequestHandler<SQSEvent, SQSBatchResp
         List<SQSBatchResponse.BatchItemFailure> failures = new ArrayList<>();
         for (SQSEvent.SQSMessage message : event.getRecords()) {
             try {
-                check(parse(message.getBody()));
+                Request request = parse(message.getBody());
+                check(request);
             } catch (Exception processingFailure) {
                 failures.add(new SQSBatchResponse.BatchItemFailure(message.getMessageId()));
             }
@@ -45,10 +46,7 @@ public class CheckerererHandler implements RequestHandler<SQSEvent, SQSBatchResp
 
     private Request parse(String body) throws java.io.IOException {
         Request request = json.readValue(body, Request.class);
-        if (request.url() == null || request.url().isBlank()) {
-            throw new IllegalArgumentException("message has no url: " + body);
-        }
-        return request;
+        return Request.Validator.validate(request);
     }
 
     private void check(Request request) {
