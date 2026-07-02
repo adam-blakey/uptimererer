@@ -1,4 +1,4 @@
-package family.blakey.uptimererer;
+package family.blakey.uptimererer.checkererer;
 
 import io.quarkus.test.junit.QuarkusIntegrationTest;
 

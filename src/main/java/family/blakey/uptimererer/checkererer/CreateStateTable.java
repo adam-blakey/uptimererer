@@ -1,5 +1,6 @@
-package family.blakey.uptimererer;
+package family.blakey.uptimererer.checkererer;
 
+import family.blakey.uptimererer.core.db.StateRecord;
 import io.quarkus.arc.profile.IfBuildProfile;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 

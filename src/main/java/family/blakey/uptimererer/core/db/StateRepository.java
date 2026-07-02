@@ -1,4 +1,4 @@
-package family.blakey.uptimererer;
+package family.blakey.uptimererer.core.db;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 

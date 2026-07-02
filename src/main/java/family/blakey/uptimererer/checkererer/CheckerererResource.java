@@ -1,7 +1,9 @@
-package family.blakey.uptimererer;
+package family.blakey.uptimererer.checkererer;
 
 import java.time.Instant;
 
+import family.blakey.uptimererer.core.db.StateRecord;
+import family.blakey.uptimererer.core.db.StateRepository;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 
