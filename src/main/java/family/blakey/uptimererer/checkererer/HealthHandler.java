@@ -2,22 +2,24 @@ package family.blakey.uptimererer.checkererer;
 
 import java.time.Instant;
 
-import family.blakey.uptimererer.core.db.StateRecord;
 import family.blakey.uptimererer.core.db.StateRepository;
 import jakarta.ws.rs.GET;
+import jakarta.ws.rs.InternalServerErrorException;
 import jakarta.ws.rs.Path;
 
-@Path("/checkererer")
-public class CheckerererResource {
+@Path("/health")
+public class HealthHandler {
 
     private final StateRepository repository;
 
-    public CheckerererResource(StateRepository repository) {
+    public HealthHandler(StateRepository repository) {
         this.repository = repository;
     }
 
     @GET
     public void check() {
-        repository.put(new StateRecord("example", Instant.now()));
+        if (repository == null) {
+             throw new InternalServerErrorException();
+        }
     }
 }

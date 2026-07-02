@@ -36,7 +36,7 @@ public class CheckerererHandler implements RequestHandler<SQSEvent, SQSBatchResp
         for (SQSEvent.SQSMessage message : event.getRecords()) {
             try {
                 Request request = parse(message.getBody());
-                check(request);
+                checkAndRecord(request);
             } catch (Exception processingFailure) {
                 failures.add(new SQSBatchResponse.BatchItemFailure(message.getMessageId()));
             }
@@ -49,7 +49,7 @@ public class CheckerererHandler implements RequestHandler<SQSEvent, SQSBatchResp
         return Request.Validator.validate(request);
     }
 
-    private void check(Request request) {
+    private void checkAndRecord(Request request) {
         // TODO: actually make the request.
         repository.put(new StateRecord(request.url(), Instant.now()));
     }

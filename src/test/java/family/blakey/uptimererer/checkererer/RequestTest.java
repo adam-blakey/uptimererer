@@ -1,7 +1,7 @@
 package family.blakey.uptimererer.checkererer;
 
+import io.quarkus.test.junit.QuarkusIntegrationTest;
 import io.quarkus.test.junit.QuarkusTest;
-import jakarta.ws.rs.BadRequestException;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EmptySource;
@@ -33,7 +33,7 @@ class RequestTest {
         void rejectsInvalidUrl(String url) {
             var request = new Request(scheme + url);
 
-            assertThrows(BadRequestException.class, () -> Request.Validator.validate(request));
+            assertThrows(IllegalArgumentException.class, () -> Request.Validator.validate(request));
         }
     }
 
@@ -60,7 +60,7 @@ class RequestTest {
         void rejectsInvalidUrl(String url) {
             var request = new Request(url);
 
-            assertThrows(BadRequestException.class, () -> Request.Validator.validate(request));
+            assertThrows(IllegalArgumentException.class, () -> Request.Validator.validate(request));
         }
     }
 }

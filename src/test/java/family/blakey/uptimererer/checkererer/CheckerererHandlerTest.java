@@ -5,6 +5,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 
+import com.amazonaws.services.lambda.runtime.Context;
+import io.quarkus.test.Mock;
+import io.quarkus.test.junit.QuarkusIntegrationTest;
 import org.junit.jupiter.api.Test;
 
 import com.amazonaws.services.lambda.runtime.events.SQSBatchResponse;
@@ -31,7 +34,7 @@ class CheckerererHandlerTest {
         SQSBatchResponse response = handler.handleRequest(event("not json"), null);
 
         assertEquals(1, response.getBatchItemFailures().size());
-        assertEquals("message-1", response.getBatchItemFailures().get(0).getItemIdentifier());
+        assertEquals("message-1", response.getBatchItemFailures().getFirst().getItemIdentifier());
     }
 
     private static SQSEvent event(String body) {
