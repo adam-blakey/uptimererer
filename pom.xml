@@ -77,7 +77,8 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-compiler-plugin</artifactId>
-          <version>3.13.0</version>
+          <!-- 3.14+ understands JDK 24/25; 3.13 mis-reports "release version 21 not supported". -->
+          <version>3.14.0</version>
           <configuration>
             <!-- Emit parameter names so Jackson can bind record components. -->
             <parameters>true</parameters>
