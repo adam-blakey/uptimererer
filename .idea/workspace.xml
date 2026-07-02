@@ -1,0 +1,249 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="ALL" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="ac368869-f1c7-4a9e-a5be-62802d981c85" name="Changes" comment="Made syntax updates and updated gitignore." />
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="GOROOT" url="file:///snap/go/current" />
+  <component name="Git.Settings">
+    <option name="INCOMING_COMMITS_CHECK_STRATEGY" value="FETCH" />
+    <option name="RECENT_BRANCH_BY_REPOSITORY">
+      <map>
+        <entry key="$PROJECT_DIR$" value="experiment/floci" />
+      </map>
+    </option>
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;adam-blakey&quot;
+  }
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/adam-blakey/uptimererer.git&quot;,
+    &quot;accountId&quot;: &quot;14f8c6d0-7951-4aed-8265-32476fa63250&quot;
+  }
+}</component>
+  <component name="NextEditCompletionFeaturesState">
+    <decayedCancelled>
+      <entry key="MS100" value="1.0003133364007721" />
+      <entry key="MS500" value="1.1991600240713955" />
+      <entry key="S2" value="1.6680370391950499" />
+      <entry key="S5" value="1.850981692441949" />
+      <entry key="S10" value="1.9224866895744075" />
+      <entry key="S30" value="1.973464315613742" />
+      <entry key="S60" value="1.9866429524472071" />
+      <entry key="M2" value="1.9932990246885565" />
+      <entry key="M5" value="1.9973372212299134" />
+      <entry key="M10" value="2.0274444595516403" />
+      <entry key="M15" value="2.3345541704573307" />
+      <entry key="M30" value="6.460650801824931" />
+      <entry key="H1" value="19.666198034820738" />
+      <entry key="H2" value="38.072559664110386" />
+      <entry key="H4" value="53.89581596467046" />
+      <entry key="D1" value="72.51306784357506" />
+      <entry key="W1" value="76.34136666369838" />
+    </decayedCancelled>
+    <decayedSelected>
+      <entry key="MS100" value="0.0" />
+      <entry key="MS500" value="0.0" />
+      <entry key="S2" value="0.0" />
+      <entry key="S5" value="0.0" />
+      <entry key="S10" value="0.0" />
+      <entry key="S30" value="0.0" />
+      <entry key="S60" value="0.0" />
+      <entry key="M2" value="0.0" />
+      <entry key="M5" value="0.0" />
+      <entry key="M10" value="0.0" />
+      <entry key="M15" value="0.0" />
+      <entry key="M30" value="0.0" />
+      <entry key="H1" value="0.0" />
+      <entry key="H2" value="0.0" />
+      <entry key="H4" value="0.0" />
+      <entry key="D1" value="0.0" />
+      <entry key="W1" value="0.0" />
+    </decayedSelected>
+    <decayedShown>
+      <entry key="MS100" value="0.5176470991295408" />
+      <entry key="MS500" value="0.9845231661378365" />
+      <entry key="S2" value="1.5407677130065331" />
+      <entry key="S5" value="1.7873203893171836" />
+      <entry key="S10" value="1.888089652575061" />
+      <entry key="S30" value="1.9613809705817535" />
+      <entry key="S60" value="1.9805209313050607" />
+      <entry key="M2" value="1.9902176843408481" />
+      <entry key="M5" value="1.996099772936798" />
+      <entry key="M10" value="2.0268240043266044" />
+      <entry key="M15" value="2.334134329757422" />
+      <entry key="M30" value="6.460403698726013" />
+      <entry key="H1" value="19.666018402662374" />
+      <entry key="H2" value="38.0724318939951" />
+      <entry key="H4" value="53.89573599207669" />
+      <entry key="D1" value="72.51305138613839" />
+      <entry key="W1" value="76.34136422110085" />
+    </decayedShown>
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 4
+}</component>
+  <component name="ProjectId" id="39UtMIYyMmOgYm0ckxPPFPGW2Jf" />
+  <component name="ProjectLevelVcsManager">
+    <OptionsSetting value="false" id="Update" />
+  </component>
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Go Build.go build checker/.executor&quot;: &quot;Profiler#5&quot;,
+    &quot;Makefile Target.build-lambda.executor&quot;: &quot;Run&quot;,
+    &quot;Makefile Target.deploy-localstack.executor&quot;: &quot;Run&quot;,
+    &quot;Makefile Target.destroy-aws.executor&quot;: &quot;Run&quot;,
+    &quot;Makefile Target.install-cdk.executor&quot;: &quot;Run&quot;,
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.GoLinterPluginOnboardingV2&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.GoLinterPluginStorageMigration&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.GoPerformanceToolWindowEnableInLayout&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.go.analysis.ui.options.defaults&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.go.formatter.settings.were.checked&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.go.modules.go.list.on.any.changes.was.set&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
+    &quot;codeWithMe.voiceChat.enabledByDefault&quot;: &quot;false&quot;,
+    &quot;com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;experiment/floci-java&quot;,
+    &quot;git.auto.fetch.suggestion.counter&quot;: &quot;1&quot;,
+    &quot;go.sdk.automatically.set&quot;: &quot;true&quot;,
+    &quot;junie.onboarding.icon.badge.shown&quot;: &quot;true&quot;,
+    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/home/adam/Git/uptimererer&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;com.codeium.AppSettingsConfigurable&quot;,
+    &quot;to.speed.mode.migration.done&quot;: &quot;true&quot;,
+    &quot;ts.external.directory.path&quot;: &quot;/home/adam/Git/uptimererer/node_modules/typescript/lib&quot;
+  }
+}</component>
+  <component name="RunManager" selected="Makefile Target.build-lambda">
+    <configuration name="go build checker/" type="GoApplicationRunConfiguration" factoryName="Go Application" nameIsGenerated="true">
+      <module name="uptimererer" />
+      <working_directory value="$PROJECT_DIR$" />
+      <kind value="PACKAGE" />
+      <package value="github.com/adamblakey/uptimererer/cmd/checker" />
+      <directory value="$PROJECT_DIR$" />
+      <auto_managed_config_id value="$PROJECT_DIR$/cmd/checker" />
+      <method v="2" />
+    </configuration>
+    <configuration name="go build deploy/" type="GoApplicationRunConfiguration" factoryName="Go Application" nameIsGenerated="true">
+      <module name="uptimererer" />
+      <working_directory value="$PROJECT_DIR$" />
+      <kind value="PACKAGE" />
+      <package value="github.com/adamblakey/uptimererer/cmd/deploy" />
+      <directory value="$PROJECT_DIR$" />
+      <auto_managed_config_id value="$PROJECT_DIR$/cmd/deploy" />
+      <method v="2" />
+    </configuration>
+    <configuration name="build-lambda" type="MAKEFILE_TARGET_RUN_CONFIGURATION" factoryName="Makefile" temporary="true">
+      <makefile filename="$PROJECT_DIR$/Makefile" target="build-lambda" workingDirectory="" arguments="">
+        <envs />
+      </makefile>
+      <method v="2" />
+    </configuration>
+    <configuration name="deploy-localstack" type="MAKEFILE_TARGET_RUN_CONFIGURATION" factoryName="Makefile" temporary="true">
+      <makefile filename="$PROJECT_DIR$/Makefile" target="deploy-localstack" workingDirectory="" arguments="">
+        <envs />
+      </makefile>
+      <method v="2" />
+    </configuration>
+    <configuration name="destroy-aws" type="MAKEFILE_TARGET_RUN_CONFIGURATION" factoryName="Makefile" temporary="true">
+      <makefile filename="$PROJECT_DIR$/Makefile" target="destroy-aws" workingDirectory="" arguments="">
+        <envs />
+      </makefile>
+      <method v="2" />
+    </configuration>
+    <configuration name="install-cdk" type="MAKEFILE_TARGET_RUN_CONFIGURATION" factoryName="Makefile" temporary="true">
+      <makefile filename="$PROJECT_DIR$/Makefile" target="install-cdk" workingDirectory="" arguments="">
+        <envs />
+      </makefile>
+      <method v="2" />
+    </configuration>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Makefile Target.install-cdk" />
+        <item itemvalue="Makefile Target.destroy-aws" />
+        <item itemvalue="Makefile Target.deploy-localstack" />
+        <item itemvalue="Makefile Target.build-lambda" />
+        <item itemvalue="Makefile Target.install-cdk" />
+      </list>
+    </recent_temporary>
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-jdk-30f59d01ecdd-58e2ab36d051-intellij.indexing.shared.core-IU-262.8377.35" />
+        <option value="bundled-js-predefined-d6986cc7102b-24ccedb99027-JavaScript-IU-262.8377.35" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="ac368869-f1c7-4a9e-a5be-62802d981c85" name="Changes" comment="" />
+      <created>1770762427809</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1770762427809</updated>
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="Got Windsurf to try and fix deployment." />
+    <MESSAGE value="Vibe-coded new deployment script." />
+    <MESSAGE value="Fresh slate." />
+    <MESSAGE value="Added architecture diagram." />
+    <MESSAGE value="Claude's implementation plan. Which I'll ignore." />
+    <MESSAGE value="Checkererer." />
+    <MESSAGE value="Made syntax updates and updated gitignore." />
+    <option name="LAST_COMMIT_MESSAGE" value="Made syntax updates and updated gitignore." />
+  </component>
+  <component name="VgoModernizerVersionTracker">
+    <upgrades>
+      <map>
+        <entry key="$PROJECT_DIR$/go.mod">
+          <value>
+            <VersionUpgradeInfo>
+              <version>1.26.4</version>
+              <timestamp>1782944954129</timestamp>
+            </VersionUpgradeInfo>
+          </value>
+        </entry>
+      </map>
+    </upgrades>
+  </component>
+</project>
