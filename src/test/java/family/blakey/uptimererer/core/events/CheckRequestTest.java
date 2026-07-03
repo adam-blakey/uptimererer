@@ -1,16 +1,14 @@
-package family.blakey.uptimererer.checkererer;
+package family.blakey.uptimererer.core.events;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import io.quarkus.test.junit.QuarkusTest;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EmptySource;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 
-@QuarkusTest
-class RequestTest {
+class CheckRequestTest {
 
   @Nested
   abstract class WithScheme {
@@ -34,9 +32,9 @@ class RequestTest {
           "example/path.com"
         })
     void acceptsValidUrl(String url) {
-      var request = new Request(scheme + url);
+      var request = new CheckRequest(scheme + url);
 
-      var parsed = Request.Validator.validate(request);
+      var parsed = CheckRequest.Validator.validate(request);
 
       assertNotNull(parsed);
     }
@@ -45,9 +43,9 @@ class RequestTest {
     @EmptySource
     @ValueSource(strings = {"1.1", "1.1.1.1.", "255.255.255.256"})
     void rejectsInvalidUrl(String url) {
-      var request = new Request(scheme + url);
+      var request = new CheckRequest(scheme + url);
 
-      assertThrows(IllegalArgumentException.class, () -> Request.Validator.validate(request));
+      assertThrows(IllegalArgumentException.class, () -> CheckRequest.Validator.validate(request));
     }
   }
 
@@ -72,9 +70,9 @@ class RequestTest {
     @NullAndEmptySource
     @ValueSource(strings = {"google.com", "1.1.1.1"})
     void rejectsInvalidUrl(String url) {
-      var request = new Request(url);
+      var request = new CheckRequest(url);
 
-      assertThrows(IllegalArgumentException.class, () -> Request.Validator.validate(request));
+      assertThrows(IllegalArgumentException.class, () -> CheckRequest.Validator.validate(request));
     }
   }
 }

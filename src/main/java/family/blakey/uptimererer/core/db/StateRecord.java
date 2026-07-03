@@ -2,6 +2,7 @@ package family.blakey.uptimererer.core.db;
 
 import java.time.Instant;
 import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbConvertedBy;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbImmutable;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbPartitionKey;
 import software.amazon.awssdk.services.dynamodb.model.AttributeDefinition;
@@ -10,8 +11,16 @@ import software.amazon.awssdk.services.dynamodb.model.CreateTableRequest;
 import software.amazon.awssdk.services.dynamodb.model.KeySchemaElement;
 import software.amazon.awssdk.services.dynamodb.model.KeyType;
 
+/**
+ * The last observed state of one website: what the latest check saw ({@code status}, {@code
+ * lastCheckedAt}) and when the status last flipped ({@code lastChangedAt}).
+ */
 @DynamoDbImmutable(builder = StateRecord.Builder.class)
-public record StateRecord(@DynamoDbPartitionKey String websiteId, Instant lastCheckedAt) {
+public record StateRecord(
+    @DynamoDbPartitionKey String websiteId,
+    Instant lastCheckedAt,
+    @DynamoDbConvertedBy(Status.Converter.class) Status status,
+    Instant lastChangedAt) {
 
   public static final TableSchema<StateRecord> TABLE_SCHEMA =
       TableSchema.fromClass(StateRecord.class);
@@ -38,6 +47,8 @@ public record StateRecord(@DynamoDbPartitionKey String websiteId, Instant lastCh
   public static final class Builder {
     private String websiteId;
     private Instant lastCheckedAt;
+    private Status status;
+    private Instant lastChangedAt;
 
     @SuppressWarnings("unused")
     public Builder websiteId(String websiteId) {
@@ -51,8 +62,20 @@ public record StateRecord(@DynamoDbPartitionKey String websiteId, Instant lastCh
     }
 
     @SuppressWarnings("unused")
+    public Builder status(Status status) {
+      this.status = status;
+      return this;
+    }
+
+    @SuppressWarnings("unused")
+    public Builder lastChangedAt(Instant lastChangedAt) {
+      this.lastChangedAt = lastChangedAt;
+      return this;
+    }
+
+    @SuppressWarnings("unused")
     public StateRecord build() {
-      return new StateRecord(websiteId, lastCheckedAt);
+      return new StateRecord(websiteId, lastCheckedAt, status, lastChangedAt);
     }
   }
 }

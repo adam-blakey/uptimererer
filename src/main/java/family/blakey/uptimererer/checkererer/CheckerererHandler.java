@@ -2,51 +2,58 @@ package family.blakey.uptimererer.checkererer;
 
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
-import com.amazonaws.services.lambda.runtime.events.SQSBatchResponse;
-import com.amazonaws.services.lambda.runtime.events.SQSEvent;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import family.blakey.uptimererer.core.db.StateRecord;
 import family.blakey.uptimererer.core.db.StateRepository;
-import jakarta.inject.Inject;
+import family.blakey.uptimererer.core.db.Status;
+import family.blakey.uptimererer.core.events.CheckRequest;
+import family.blakey.uptimererer.core.events.CheckRequestedEvent;
+import family.blakey.uptimererer.notifierer.StatusChangeNotifier;
+import jakarta.inject.Named;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Optional;
 
 /**
- * Entry point when the checkererer runs as a Lambda behind the SQS event source mapping. Each
- * message body is a {@link Request}.
+ * Entry point when the checkererer runs as a Lambda targeted by the event-bus rule: each {@code
+ * check-requested} event carries one {@link CheckRequest}. The website is pinged, the observed
+ * state is written to DynamoDB, and a status flip is handed to the notifierer.
  *
- * <p>A website that fails its ping is a successfully processed message — only genuine processing
- * failures (malformed body, DynamoDB unavailable) are reported back to SQS, per message, for retry
- * and eventual dead-lettering.
+ * <p>A website that fails its ping is a successfully processed event — only genuine processing
+ * failures (malformed event, DynamoDB unavailable) throw, so EventBridge/Lambda retry them.
  */
-public class CheckerererHandler implements RequestHandler<SQSEvent, SQSBatchResponse> {
+@Named("checkererer")
+public class CheckerererHandler implements RequestHandler<CheckRequestedEvent, Void> {
 
-  @Inject ObjectMapper json;
+  private final HttpChecker checker;
+  private final StateRepository repository;
+  private final StatusChangeNotifier notifier;
 
-  @Inject StateRepository repository;
+  public CheckerererHandler(
+      HttpChecker checker, StateRepository repository, StatusChangeNotifier notifier) {
+    this.checker = checker;
+    this.repository = repository;
+    this.notifier = notifier;
+  }
 
   @Override
-  public SQSBatchResponse handleRequest(SQSEvent event, Context context) {
-    List<SQSBatchResponse.BatchItemFailure> failures = new ArrayList<>();
-    for (SQSEvent.SQSMessage message : event.getRecords()) {
-      try {
-        Request request = parse(message.getBody());
-        checkAndRecord(request);
-      } catch (Exception processingFailure) {
-        failures.add(new SQSBatchResponse.BatchItemFailure(message.getMessageId()));
-      }
+  public Void handleRequest(CheckRequestedEvent event, Context context) {
+    CheckRequest request = CheckRequest.Validator.validate(event == null ? null : event.detail());
+    checkAndRecord(request);
+    return null;
+  }
+
+  private void checkAndRecord(CheckRequest request) {
+    Status observed = checker.check(request.url());
+    Instant now = Instant.now();
+
+    Optional<StateRecord> previous = repository.find(request.url());
+    boolean changed = previous.isPresent() && previous.get().status() != observed;
+    Instant lastChangedAt = changed || previous.isEmpty() ? now : previous.get().lastChangedAt();
+
+    StateRecord current = new StateRecord(request.url(), now, observed, lastChangedAt);
+    repository.put(current);
+
+    if (changed) {
+      notifier.statusChanged(current);
     }
-    return new SQSBatchResponse(failures);
-  }
-
-  private Request parse(String body) throws java.io.IOException {
-    Request request = json.readValue(body, Request.class);
-    return Request.Validator.validate(request);
-  }
-
-  private void checkAndRecord(Request request) {
-    // TODO: actually make the request.
-    repository.put(new StateRecord(request.url(), Instant.now()));
   }
 }

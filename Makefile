@@ -7,7 +7,8 @@ ifeq ($(shell test "$(JAVA_MAJOR)" -ge 24 2>/dev/null && echo yes),yes)
 endif
 
 .PHONY: build dev dev-floci dev-localstack deploy deploy-floci deploy-localstack \
-	send state emulator-floci emulator-localstack local-down test
+	send tick add-url urls subscribe state emulator-floci emulator-localstack \
+	local-down test
 
 # Ensures the emulator service $(1) is the one serving :4566: reuses a running
 # container with a matching image (however it was started), otherwise stops
@@ -38,10 +39,30 @@ deploy-localstack: emulator-localstack deploy
 deploy:
 	./mvnw -q package -DskipTests exec:java -Dexec.args="deploy"
 
-# Queue a check request for URL, e.g. make send URL=https://example.com
+# Queue a one-off check request for URL, e.g. make send URL=https://example.com
 send:
 	@test -n "$(URL)" || { echo "usage: make send URL=https://example.com" >&2; exit 1; }
 	./mvnw -q compile exec:java -Dexec.args="send -url $(URL)"
+
+# Queue a scheduler tick now (checks every configured URL) instead of waiting
+# for the every-minute EventBridge rule.
+tick:
+	./mvnw -q compile exec:java -Dexec.args="tick"
+
+# Configure URL for checking on every tick, e.g. make add-url URL=https://example.com
+# (NAME overrides the Systems Manager parameter name suffix; defaults to the host).
+add-url:
+	@test -n "$(URL)" || { echo "usage: make add-url URL=https://example.com [NAME=example]" >&2; exit 1; }
+	./mvnw -q compile exec:java -Dexec.args="add-url -url $(URL)$(if $(NAME), -name $(NAME))"
+
+# Print the URLs configured in Systems Manager.
+urls:
+	./mvnw -q compile exec:java -Dexec.args="urls"
+
+# Subscribe EMAIL to on/offline notifications, e.g. make subscribe EMAIL=me@example.com
+subscribe:
+	@test -n "$(EMAIL)" || { echo "usage: make subscribe EMAIL=me@example.com" >&2; exit 1; }
+	./mvnw -q compile exec:java -Dexec.args="subscribe -email $(EMAIL)"
 
 # Print all site state records from DynamoDB.
 state:
