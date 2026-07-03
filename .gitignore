@@ -11,6 +11,10 @@
 # Test binary, built with `go test -c`
 *.test
 
+# Lambda bootstrap binaries
+lambda/*/bootstrap
+lambda/*/main
+
 # Code coverage profiles and other test artifacts
 *.out
 coverage.*
@@ -49,3 +53,5 @@ yarn-error.log*
 
 # DynamoDB Local
 .dynamodb/
+lambda/checkererer/checkererer
+lambda/dispatchererer/dispatchererer

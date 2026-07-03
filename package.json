@@ -13,6 +13,13 @@
     "destroy-localstack": "cdk destroy --context environment=localstack",
     "destroy-aws": "cdk destroy --context environment=aws"
   },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "testMatch": [
+      "**/test/**/*.test.ts"
+    ]
+  },
   "keywords": [
     "aws",
     "cdk",
