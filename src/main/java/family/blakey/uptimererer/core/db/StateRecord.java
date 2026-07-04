@@ -1,7 +1,9 @@
 package family.blakey.uptimererer.core.db;
 
+import java.lang.invoke.MethodHandles;
 import java.time.Instant;
 import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.ImmutableTableSchemaParams;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbConvertedBy;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbImmutable;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbPartitionKey;
@@ -22,8 +24,14 @@ public record StateRecord(
     @DynamoDbConvertedBy(Status.Converter.class) Status status,
     Instant lastChangedAt) {
 
+  // Built with this class's lookup so the SDK's generated lambda bridges resolve app classes
+  // (Status.Converter, the Builder) even when the SDK sits in a parent classloader, as it does
+  // under Quarkus dev-mode continuous testing.
   public static final TableSchema<StateRecord> TABLE_SCHEMA =
-      TableSchema.fromClass(StateRecord.class);
+      TableSchema.fromImmutableClass(
+          ImmutableTableSchemaParams.builder(StateRecord.class)
+              .lookup(MethodHandles.lookup())
+              .build());
 
   /** The request that creates the table this record lives in, derived from the schema. */
   public static CreateTableRequest createTableRequest(String tableName) {
