@@ -1,8 +1,9 @@
 package family.blakey.uptimererer.deploy;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import family.blakey.uptimererer.checkererer.Request;
 import family.blakey.uptimererer.core.db.StateRecord;
+import family.blakey.uptimererer.core.events.CheckRequest;
+import family.blakey.uptimererer.core.events.CheckRequestedEvent;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -12,6 +13,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
@@ -27,12 +29,18 @@ import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.ListTablesRequest;
 import software.amazon.awssdk.services.dynamodb.model.ResourceInUseException;
+import software.amazon.awssdk.services.eventbridge.EventBridgeClient;
+import software.amazon.awssdk.services.eventbridge.model.PutRuleRequest;
+import software.amazon.awssdk.services.eventbridge.model.PutTargetsRequest;
+import software.amazon.awssdk.services.eventbridge.model.ResourceAlreadyExistsException;
+import software.amazon.awssdk.services.eventbridge.model.Target;
 import software.amazon.awssdk.services.iam.IamClient;
 import software.amazon.awssdk.services.iam.model.CreateRoleRequest;
 import software.amazon.awssdk.services.iam.model.CreateRoleResponse;
 import software.amazon.awssdk.services.iam.model.EntityAlreadyExistsException;
 import software.amazon.awssdk.services.iam.model.GetRoleRequest;
 import software.amazon.awssdk.services.lambda.LambdaClient;
+import software.amazon.awssdk.services.lambda.model.AddPermissionRequest;
 import software.amazon.awssdk.services.lambda.model.Architecture;
 import software.amazon.awssdk.services.lambda.model.CreateEventSourceMappingRequest;
 import software.amazon.awssdk.services.lambda.model.CreateFunctionRequest;
@@ -46,6 +54,9 @@ import software.amazon.awssdk.services.lambda.model.ResourceNotFoundException;
 import software.amazon.awssdk.services.lambda.model.Runtime;
 import software.amazon.awssdk.services.lambda.model.UpdateFunctionCodeRequest;
 import software.amazon.awssdk.services.lambda.model.UpdateFunctionConfigurationRequest;
+import software.amazon.awssdk.services.sns.SnsClient;
+import software.amazon.awssdk.services.sns.model.CreateTopicRequest;
+import software.amazon.awssdk.services.sns.model.SubscribeRequest;
 import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sqs.model.CreateQueueRequest;
 import software.amazon.awssdk.services.sqs.model.GetQueueAttributesRequest;
@@ -53,73 +64,116 @@ import software.amazon.awssdk.services.sqs.model.GetQueueUrlRequest;
 import software.amazon.awssdk.services.sqs.model.QueueAttributeName;
 import software.amazon.awssdk.services.sqs.model.QueueDoesNotExistException;
 import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
+import software.amazon.awssdk.services.sqs.model.SetQueueAttributesRequest;
+import software.amazon.awssdk.services.ssm.SsmClient;
+import software.amazon.awssdk.services.ssm.model.ParameterType;
+import software.amazon.awssdk.services.ssm.model.PutParameterRequest;
 
 /**
- * Provisions the checkererer stack — DynamoDB state table, SQS check queue, and the checkererer
- * Lambda wired to it — against a local AWS emulator (Floci or LocalStack) on :4566. It exists so
- * the real Lambda artifact ({@code target/function.zip}) can be deployed and exercised locally with
- * no extra tooling; the Makefile wraps the subcommands:
+ * Provisions the whole uptimererer stack from the architecture diagram — EventBridge scheduler →
+ * SQS → decidererer Lambda (reading URL configs from Systems Manager) → event bus → checkererer
+ * Lambda → DynamoDB state table → SNS notification topic — against a local AWS emulator (Floci or
+ * LocalStack) on :4566. It exists so the real Lambda artifact ({@code target/function.zip}) can be
+ * deployed and exercised locally with no extra tooling; the Makefile wraps the subcommands:
  *
  * <pre>
- *   deploy         provision/update everything from the built function.zip
- *   send -url URL  queue a check request for URL
- *   state          print all site state records from DynamoDB
+ *   deploy               provision/update everything from the built function.zip
+ *   send -url URL        queue a one-off check request for URL
+ *   tick                 queue a scheduler tick (checks every configured URL now)
+ *   add-url -url URL     configure URL for checking on every tick (-name to override the id)
+ *   urls                 print the configured URLs
+ *   subscribe -email E   subscribe E to the notification topic
+ *   state                print all site state records from DynamoDB
  * </pre>
+ *
+ * <p>Both Lambdas are created from the same zip; {@code QUARKUS_LAMBDA_HANDLER} picks the handler.
  *
  * <p>Configuration comes from the environment, all optional:
  *
  * <ul>
  *   <li>{@code AWS_ENDPOINT_URL} — emulator endpoint as seen from this machine (default {@code
  *       http://localhost:4566})
- *   <li>{@code LAMBDA_DYNAMODB_ENDPOINT} — emulator endpoint as seen from inside the Lambda
- *       container (default {@code http://localhost.localstack.cloud:4566}, which LocalStack
- *       resolves; Floci may need something else)
+ *   <li>{@code LAMBDA_AWS_ENDPOINT} — emulator endpoint as seen from inside the Lambda containers
+ *       (default {@code http://localhost.localstack.cloud:4566}, which LocalStack resolves; Floci
+ *       may need something else)
  *   <li>{@code FUNCTION_ZIP} — path to the Lambda zip (default {@code target/function.zip})
  * </ul>
  */
 public final class DeployTool {
 
   private static final String QUEUE_NAME = "uptimererer-checks";
-  private static final String FUNCTION_NAME = "uptimererer-checkererer";
-  private static final String ROLE_NAME = "uptimererer-checkererer-role";
+  private static final String CHECKERERER_FUNCTION = "uptimererer-checkererer";
+  private static final String DECIDERERER_FUNCTION = "uptimererer-decidererer";
+  private static final String ROLE_NAME = "uptimererer-lambda-role";
+  private static final String TOPIC_NAME = "uptimererer-notifications";
+  private static final String TICK_RULE = "uptimererer-tick";
+  private static final String CHECK_REQUESTED_RULE = "uptimererer-check-requested";
 
-  // Quarkus' generic entry point; it locates CheckerererHandler itself.
+  // Quarkus' generic entry point; QUARKUS_LAMBDA_HANDLER selects the named handler.
   private static final String HANDLER =
       "io.quarkus.amazon.lambda.runtime.QuarkusStreamHandler::handleRequest";
   private static final String DEFAULT_FUNCTION_ZIP = "target/function.zip";
   private static final Duration READY_TIMEOUT = Duration.ofSeconds(90);
 
   private final ObjectMapper mapper = new ObjectMapper();
-  private final String tableName = stateTableName();
+  private final Properties applicationProperties = applicationProperties();
+  private final String tableName = requiredProperty("uptimererer.state-table");
+  private final String busName = requiredProperty("uptimererer.event-bus");
+  private final String urlParameterPrefix = requiredProperty("uptimererer.url-parameter-prefix");
   private final DynamoDbClient ddb;
   private final IamClient iam;
   private final SqsClient sqs;
   private final LambdaClient lambda;
+  private final EventBridgeClient events;
+  private final SnsClient sns;
+  private final SsmClient ssm;
 
-  DeployTool(DynamoDbClient ddb, IamClient iam, SqsClient sqs, LambdaClient lambda) {
+  DeployTool(
+      DynamoDbClient ddb,
+      IamClient iam,
+      SqsClient sqs,
+      LambdaClient lambda,
+      EventBridgeClient events,
+      SnsClient sns,
+      SsmClient ssm) {
     this.ddb = ddb;
     this.iam = iam;
     this.sqs = sqs;
     this.lambda = lambda;
+    this.events = events;
+    this.sns = sns;
+    this.ssm = ssm;
   }
 
   public static void main(String[] args) {
     if (args.length < 1) {
-      fail("usage: deploy <deploy|send|state> [flags]");
+      fail("usage: deploy <deploy|send|tick|add-url|urls|subscribe|state> [flags]");
     }
 
     URI endpoint = URI.create(env("AWS_ENDPOINT_URL", "http://localhost:4566"));
     try (DynamoDbClient ddb = configure(DynamoDbClient.builder(), endpoint).build();
         IamClient iam = configure(IamClient.builder(), endpoint).region(Region.AWS_GLOBAL).build();
         SqsClient sqs = configure(SqsClient.builder(), endpoint).build();
-        LambdaClient lambda = configure(LambdaClient.builder(), endpoint).build()) {
+        LambdaClient lambda = configure(LambdaClient.builder(), endpoint).build();
+        EventBridgeClient events = configure(EventBridgeClient.builder(), endpoint).build();
+        SnsClient sns = configure(SnsClient.builder(), endpoint).build();
+        SsmClient ssm = configure(SsmClient.builder(), endpoint).build()) {
 
-      DeployTool tool = new DeployTool(ddb, iam, sqs, lambda);
+      DeployTool tool = new DeployTool(ddb, iam, sqs, lambda, events, sns, ssm);
+      String[] flags = Arrays.copyOfRange(args, 1, args.length);
       switch (args[0]) {
         case "deploy" -> tool.deploy();
-        case "send" -> tool.send(Arrays.copyOfRange(args, 1, args.length));
+        case "send" -> tool.send(flags);
+        case "tick" -> tool.tick();
+        case "add-url" -> tool.addUrl(flags);
+        case "urls" -> tool.urls();
+        case "subscribe" -> tool.subscribe(flags);
         case "state" -> tool.state();
-        default -> fail("unknown subcommand '" + args[0] + "' (expected deploy, send or state)");
+        default ->
+            fail(
+                "unknown subcommand '"
+                    + args[0]
+                    + "' (expected deploy, send, tick, add-url, urls, subscribe or state)");
       }
     } catch (Exception e) {
       fail(e.getMessage());
@@ -145,15 +199,40 @@ public final class DeployTool {
     SdkBytes code = SdkBytes.fromByteArray(Files.readAllBytes(functionZipPath()));
     waitReady();
 
+    String lambdaEndpoint = env("LAMBDA_AWS_ENDPOINT", "http://localhost.localstack.cloud:4566");
+
     String roleArn = ensureRole();
     ensureTable();
     String queueArn = ensureQueue();
-    ensureFunction(roleArn, code);
-    ensureEventSourceMapping(queueArn);
+    String topicArn = ensureTopic();
+    ensureBus();
+
+    ensureFunction(
+        CHECKERERER_FUNCTION,
+        roleArn,
+        code,
+        Map.of(
+            "QUARKUS_LAMBDA_HANDLER", "checkererer",
+            "QUARKUS_DYNAMODB_ENDPOINT_OVERRIDE", lambdaEndpoint,
+            "QUARKUS_SNS_ENDPOINT_OVERRIDE", lambdaEndpoint,
+            "UPTIMERERER_NOTIFICATION_TOPIC_ARN", topicArn));
+    ensureFunction(
+        DECIDERERER_FUNCTION,
+        roleArn,
+        code,
+        Map.of(
+            "QUARKUS_LAMBDA_HANDLER", "decidererer",
+            "QUARKUS_SSM_ENDPOINT_OVERRIDE", lambdaEndpoint,
+            "QUARKUS_EVENTBRIDGE_ENDPOINT_OVERRIDE", lambdaEndpoint));
+
+    ensureEventSourceMapping(queueArn, DECIDERERER_FUNCTION);
+    ensureTickRule(queueArn);
+    ensureCheckRequestedRule();
 
     System.out.printf(
-        "deployed: table=%s queue=%s function=%s%n", tableName, QUEUE_NAME, FUNCTION_NAME);
-    System.out.println("try: make send URL=https://example.com");
+        "deployed: table=%s queue=%s bus=%s topic=%s functions=%s,%s%n",
+        tableName, QUEUE_NAME, busName, TOPIC_NAME, DECIDERERER_FUNCTION, CHECKERERER_FUNCTION);
+    System.out.println("try: make add-url URL=https://example.com, then make tick");
   }
 
   /**
@@ -219,63 +298,71 @@ public final class DeployTool {
         .get(QueueAttributeName.QUEUE_ARN);
   }
 
-  private void ensureFunction(String roleArn, SdkBytes code) {
-    // The function runs the prod profile, which deliberately has no DynamoDB endpoint override
-    // baked in — point it at the emulator as seen from inside the Lambda container.
-    Environment env =
-        Environment.builder()
-            .variables(
-                Map.of(
-                    "QUARKUS_DYNAMODB_ENDPOINT_OVERRIDE",
-                    env("LAMBDA_DYNAMODB_ENDPOINT", "http://localhost.localstack.cloud:4566")))
-            .build();
+  private String ensureTopic() {
+    // CreateTopic is idempotent: it returns the existing topic's ARN.
+    return sns.createTopic(CreateTopicRequest.builder().name(TOPIC_NAME).build()).topicArn();
+  }
 
-    if (!functionExists()) {
+  private void ensureBus() {
+    try {
+      events.createEventBus(b -> b.name(busName));
+      System.out.println("created event bus " + busName);
+    } catch (ResourceAlreadyExistsException e) {
+      // bus already exists
+    }
+  }
+
+  private void ensureFunction(String name, String roleArn, SdkBytes code, Map<String, String> env) {
+    // The functions run the prod profile, which deliberately has no endpoint overrides baked
+    // in — the env map points each client at the emulator as seen from inside the container.
+    Environment environment = Environment.builder().variables(env).build();
+
+    if (!functionExists(name)) {
       lambda.createFunction(
           CreateFunctionRequest.builder()
-              .functionName(FUNCTION_NAME)
+              .functionName(name)
               .role(roleArn)
               .runtime(Runtime.JAVA25)
               .handler(HANDLER)
               .architectures(Architecture.X86_64)
               .code(FunctionCode.builder().zipFile(code).build())
-              .environment(env)
+              .environment(environment)
               .timeout(30)
               .memorySize(512)
               .build());
-      System.out.println("created function " + FUNCTION_NAME);
-      waitFunctionSettled();
+      System.out.println("created function " + name);
+      waitFunctionSettled(name);
       return;
     }
 
     lambda.updateFunctionCode(
-        UpdateFunctionCodeRequest.builder().functionName(FUNCTION_NAME).zipFile(code).build());
-    waitFunctionSettled();
+        UpdateFunctionCodeRequest.builder().functionName(name).zipFile(code).build());
+    waitFunctionSettled(name);
     lambda.updateFunctionConfiguration(
         UpdateFunctionConfigurationRequest.builder()
-            .functionName(FUNCTION_NAME)
+            .functionName(name)
             .role(roleArn)
-            .environment(env)
+            .environment(environment)
             .build());
-    waitFunctionSettled();
-    System.out.println("updated function " + FUNCTION_NAME);
+    waitFunctionSettled(name);
+    System.out.println("updated function " + name);
   }
 
-  private boolean functionExists() {
+  private boolean functionExists(String name) {
     try {
-      lambda.getFunction(GetFunctionRequest.builder().functionName(FUNCTION_NAME).build());
+      lambda.getFunction(GetFunctionRequest.builder().functionName(name).build());
       return true;
     } catch (ResourceNotFoundException e) {
       return false;
     }
   }
 
-  private void waitFunctionSettled() {
-    lambda.waiter().waitUntilFunctionActiveV2(b -> b.functionName(FUNCTION_NAME));
-    lambda.waiter().waitUntilFunctionUpdatedV2(b -> b.functionName(FUNCTION_NAME));
+  private void waitFunctionSettled(String name) {
+    lambda.waiter().waitUntilFunctionActiveV2(b -> b.functionName(name));
+    lambda.waiter().waitUntilFunctionUpdatedV2(b -> b.functionName(name));
   }
 
-  private void ensureEventSourceMapping(String queueArn) {
+  private void ensureEventSourceMapping(String queueArn, String functionName) {
     // Checked explicitly rather than relying on ResourceConflictException: not every
     // emulator rejects a duplicate mapping, and a second one would double-deliver.
     boolean exists =
@@ -283,7 +370,7 @@ public final class DeployTool {
             .listEventSourceMappings(
                 ListEventSourceMappingsRequest.builder()
                     .eventSourceArn(queueArn)
-                    .functionName(FUNCTION_NAME)
+                    .functionName(functionName)
                     .build())
             .eventSourceMappings()
             .isEmpty();
@@ -294,15 +381,92 @@ public final class DeployTool {
       lambda.createEventSourceMapping(
           CreateEventSourceMappingRequest.builder()
               .eventSourceArn(queueArn)
-              .functionName(FUNCTION_NAME)
+              .functionName(functionName)
               .batchSize(10)
               // the handler returns SQSBatchResponse, so only failed messages are retried
               .functionResponseTypes(FunctionResponseType.REPORT_BATCH_ITEM_FAILURES)
               .build());
-      System.out.println("created event source mapping " + QUEUE_NAME + " -> " + FUNCTION_NAME);
+      System.out.println("created event source mapping " + QUEUE_NAME + " -> " + functionName);
     } catch (ResourceConflictException e) {
       // mapping already exists
     }
+  }
+
+  /** The diagram's "runs every minute": a scheduled rule on the default bus ticks the queue. */
+  private void ensureTickRule(String queueArn) {
+    String ruleArn =
+        events
+            .putRule(
+                PutRuleRequest.builder()
+                    .name(TICK_RULE)
+                    .scheduleExpression("rate(1 minute)")
+                    .build())
+            .ruleArn();
+    events.putTargets(
+        PutTargetsRequest.builder()
+            .rule(TICK_RULE)
+            .targets(Target.builder().id("checks-queue").arn(queueArn).build())
+            .build());
+
+    // Emulators don't enforce queue policies, but real EventBridge can't send without one.
+    String queueUrl =
+        sqs.getQueueUrl(GetQueueUrlRequest.builder().queueName(QUEUE_NAME).build()).queueUrl();
+    String policy =
+        ("{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\","
+                + "\"Principal\":{\"Service\":\"events.amazonaws.com\"},"
+                + "\"Action\":\"sqs:SendMessage\",\"Resource\":\"%s\","
+                + "\"Condition\":{\"ArnEquals\":{\"aws:SourceArn\":\"%s\"}}}]}")
+            .formatted(queueArn, ruleArn);
+    sqs.setQueueAttributes(
+        SetQueueAttributesRequest.builder()
+            .queueUrl(queueUrl)
+            .attributes(Map.of(QueueAttributeName.POLICY, policy))
+            .build());
+    System.out.println("scheduled rule " + TICK_RULE + " -> " + QUEUE_NAME + " (rate(1 minute))");
+  }
+
+  /** Routes the decidererer's pending requests from the custom bus into the checkererer. */
+  private void ensureCheckRequestedRule() throws IOException {
+    String pattern =
+        mapper.writeValueAsString(
+            Map.of(
+                "source", List.of(CheckRequestedEvent.SOURCE),
+                "detail-type", List.of(CheckRequestedEvent.DETAIL_TYPE)));
+    String ruleArn =
+        events
+            .putRule(
+                PutRuleRequest.builder()
+                    .name(CHECK_REQUESTED_RULE)
+                    .eventBusName(busName)
+                    .eventPattern(pattern)
+                    .build())
+            .ruleArn();
+
+    String functionArn =
+        lambda
+            .getFunction(GetFunctionRequest.builder().functionName(CHECKERERER_FUNCTION).build())
+            .configuration()
+            .functionArn();
+    events.putTargets(
+        PutTargetsRequest.builder()
+            .eventBusName(busName)
+            .rule(CHECK_REQUESTED_RULE)
+            .targets(Target.builder().id("checkererer").arn(functionArn).build())
+            .build());
+
+    try {
+      lambda.addPermission(
+          AddPermissionRequest.builder()
+              .functionName(CHECKERERER_FUNCTION)
+              .statementId("uptimererer-events-invoke")
+              .action("lambda:InvokeFunction")
+              .principal("events.amazonaws.com")
+              .sourceArn(ruleArn)
+              .build());
+    } catch (ResourceConflictException e) {
+      // permission already granted
+    }
+    System.out.println("bus rule " + CHECK_REQUESTED_RULE + " -> " + CHECKERERER_FUNCTION);
   }
 
   private void send(String[] args) throws IOException {
@@ -312,24 +476,74 @@ public final class DeployTool {
     if (url == null || url.isBlank()) {
       throw new IllegalArgumentException("send: missing required -url");
     }
-    // Fail fast with the same validation the handler applies.
-    Request request = Request.Validator.validate(new Request(url));
+    // Fail fast with the same validation the decidererer applies.
+    CheckRequest request = CheckRequest.Validator.validate(new CheckRequest(url));
 
-    String queueUrl;
-    try {
-      queueUrl =
-          sqs.getQueueUrl(GetQueueUrlRequest.builder().queueName(QUEUE_NAME).build()).queueUrl();
-    } catch (QueueDoesNotExistException e) {
-      throw new IllegalStateException(
-          "queue " + QUEUE_NAME + " not found (run `make deploy-floci` first)");
-    }
     sqs.sendMessage(
         SendMessageRequest.builder()
-            .queueUrl(queueUrl)
+            .queueUrl(queueUrl())
             .messageBody(mapper.writeValueAsString(request))
             .build());
 
     System.out.printf("queued check for %s%n", url);
+  }
+
+  /** What the scheduler does every minute, on demand: any body without a url is a tick. */
+  private void tick() {
+    sqs.sendMessage(SendMessageRequest.builder().queueUrl(queueUrl()).messageBody("{}").build());
+    System.out.println("queued a tick (checks every configured url)");
+  }
+
+  private void addUrl(String[] args) {
+    Map<String, String> flags = parseFlags(args);
+
+    String url = flags.get("url");
+    if (url == null || url.isBlank()) {
+      throw new IllegalArgumentException("add-url: missing required -url");
+    }
+    CheckRequest request = CheckRequest.Validator.validate(new CheckRequest(url));
+
+    String name = flags.getOrDefault("name", URI.create(request.url()).getHost());
+    String parameter = urlParameterPrefix + name;
+    ssm.putParameter(
+        PutParameterRequest.builder()
+            .name(parameter)
+            .value(request.url())
+            .type(ParameterType.STRING)
+            .overwrite(true)
+            .build());
+
+    System.out.printf("configured %s = %s (checked on every tick)%n", parameter, request.url());
+  }
+
+  private void urls() {
+    int count = 0;
+    for (var page :
+        ssm.getParametersByPathPaginator(b -> b.path(urlParameterPrefix).recursive(true))) {
+      for (var parameter : page.parameters()) {
+        System.out.printf("%s = %s%n", parameter.name(), parameter.value());
+        count++;
+      }
+    }
+    if (count == 0) {
+      System.out.println("no urls configured yet (make add-url URL=https://example.com)");
+    }
+  }
+
+  private void subscribe(String[] args) {
+    Map<String, String> flags = parseFlags(args);
+
+    String email = flags.get("email");
+    if (email == null || email.isBlank()) {
+      throw new IllegalArgumentException("subscribe: missing required -email");
+    }
+
+    String topicArn = ensureTopic();
+    sns.subscribe(
+        SubscribeRequest.builder().topicArn(topicArn).protocol("email").endpoint(email).build());
+    System.out.printf(
+        "subscribed %s to %s (real AWS sends a confirmation email; emulators auto-confirm)%n",
+        email, TOPIC_NAME);
   }
 
   private void state() {
@@ -354,6 +568,15 @@ public final class DeployTool {
     }
   }
 
+  private String queueUrl() {
+    try {
+      return sqs.getQueueUrl(GetQueueUrlRequest.builder().queueName(QUEUE_NAME).build()).queueUrl();
+    } catch (QueueDoesNotExistException e) {
+      throw new IllegalStateException(
+          "queue " + QUEUE_NAME + " not found (run `make deploy-floci` first)");
+    }
+  }
+
   private Path functionZipPath() {
     Path path = Path.of(env("FUNCTION_ZIP", DEFAULT_FUNCTION_ZIP));
     if (!Files.exists(path)) {
@@ -363,19 +586,23 @@ public final class DeployTool {
     return path;
   }
 
-  /** The table name the application itself is configured with, so the two can't drift. */
-  private static String stateTableName() {
+  /** The names the application itself is configured with, so the two can't drift. */
+  private static Properties applicationProperties() {
     Properties properties = new Properties();
     try (InputStream in = DeployTool.class.getResourceAsStream("/application.properties")) {
       properties.load(in);
     } catch (IOException | NullPointerException e) {
       throw new IllegalStateException("could not read application.properties from classpath", e);
     }
-    String table = properties.getProperty("uptimererer.state-table");
-    if (table == null || table.isBlank()) {
-      throw new IllegalStateException("uptimererer.state-table not set in application.properties");
+    return properties;
+  }
+
+  private String requiredProperty(String name) {
+    String value = applicationProperties.getProperty(name);
+    if (value == null || value.isBlank()) {
+      throw new IllegalStateException(name + " not set in application.properties");
     }
-    return table;
+    return value;
   }
 
   private static String env(String name, String fallback) {
