@@ -11,7 +11,7 @@ SQS → Lambda → DynamoDB slice is implemented so far.
 - Spotless (google-java-format) runs automatically at compile; don't hand-format.
 - Everything AWS-shaped runs against a local emulator (Floci or LocalStack) on
   `:4566`, started from `docker-compose.yml`. Only one emulator can hold the
-  port; the Makefile handles swapping them.
+  port; the justfile handles swapping them.
 
 ## Layout
 
@@ -21,6 +21,12 @@ SQS → Lambda → DynamoDB slice is implemented so far.
   `CreateStateTable` (dev/test-only table bootstrap).
 - `family.blakey.uptimererer.core.db` — `StateRecord` (DynamoDB enhanced-client
   schema; also derives the create-table request) and `StateRepository`.
+- `family.blakey.uptimererer.core.models` — `Website` (a checked site's config:
+  URL, method, timeout, expected status codes, failures-before-down; validates
+  itself) and `Poll` (runs one `Website` check via `java.net.http.HttpClient`,
+  returning a `Poll.Result`). Not yet wired into `CheckerererHandler`.
+- `family.blakey.uptimererer.core.Helpers` — `describe(Exception)`, a shared
+  fallback-to-class-name exception-message formatter.
 - `family.blakey.uptimererer.deploy` — `DeployTool`, the local deploy CLI (see
   below). Its extra AWS SDK deps (`sqs`, `iam`, `lambda`) are `provided`-scope
   so they stay out of the Lambda `function.zip`; it runs via `exec:java` with
@@ -28,21 +34,21 @@ SQS → Lambda → DynamoDB slice is implemented so far.
 
 ## Commands
 
-- `make test` — runs the tests. They talk to DynamoDB on `:4566`, so start an
-  emulator first (`make emulator-floci` or `emulator-localstack`).
-- `make dev-floci` / `make dev-localstack` — emulator + `quarkus:dev` (hot
+- `just test` — runs the tests. They talk to DynamoDB on `:4566`, so start an
+  emulator first (`just emulator-floci` or `emulator-localstack`).
+- `just dev-floci` / `just dev-localstack` — emulator + `quarkus:dev` (hot
   reload). The handler is invoked through the Lambda mock event server on
   `:8082` (`:8083` in tests), not through a real queue; the state table is
   auto-created on startup (`CreateStateTable`).
-- `make deploy-floci` / `make deploy-localstack` — the real thing, locally:
+- `just deploy-floci` / `just deploy-localstack` — the real thing, locally:
   builds `target/function.zip` and has `DeployTool` provision the state table,
   the `uptimererer-checks` queue, the `uptimererer-checkererer` function
   (Java 25 runtime, Quarkus stream handler) and the SQS event source mapping
   in the emulator. Idempotent; re-run to push new code.
-- `make send URL=https://example.com` — queue a check request.
-- `make state` — print all site state records from DynamoDB.
-- `make build` — just build `function.zip` (skips tests).
-- `make local-down` — stop the emulator.
+- `just send https://example.com` — queue a check request.
+- `just state` — print all site state records from DynamoDB.
+- `just build` — build `function.zip` only (skips tests).
+- `just local-down` — stop the emulator.
 
 ## DeployTool configuration (env vars, all optional)
 

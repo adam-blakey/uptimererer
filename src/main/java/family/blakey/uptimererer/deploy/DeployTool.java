@@ -58,7 +58,7 @@ import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
  * Provisions the checkererer stack — DynamoDB state table, SQS check queue, and the checkererer
  * Lambda wired to it — against a local AWS emulator (Floci or LocalStack) on :4566. It exists so
  * the real Lambda artifact ({@code target/function.zip}) can be deployed and exercised locally with
- * no extra tooling; the Makefile wraps the subcommands:
+ * no extra tooling; the justfile wraps the subcommands:
  *
  * <pre>
  *   deploy         provision/update everything from the built function.zip
@@ -153,7 +153,7 @@ public final class DeployTool {
 
     System.out.printf(
         "deployed: table=%s queue=%s function=%s%n", tableName, QUEUE_NAME, FUNCTION_NAME);
-    System.out.println("try: make send URL=https://example.com");
+    System.out.println("try: just send https://example.com");
   }
 
   /**
@@ -170,7 +170,7 @@ public final class DeployTool {
           throw new IllegalStateException(
               "endpoint not ready after "
                   + READY_TIMEOUT
-                  + " (is the emulator running? make emulator-floci): "
+                  + " (is the emulator running? just emulator-floci): "
                   + e.getMessage(),
               e);
         }
@@ -321,7 +321,7 @@ public final class DeployTool {
           sqs.getQueueUrl(GetQueueUrlRequest.builder().queueName(QUEUE_NAME).build()).queueUrl();
     } catch (QueueDoesNotExistException e) {
       throw new IllegalStateException(
-          "queue " + QUEUE_NAME + " not found (run `make deploy-floci` first)");
+          "queue " + QUEUE_NAME + " not found (run `just deploy-floci` first)");
     }
     sqs.sendMessage(
         SendMessageRequest.builder()
@@ -347,10 +347,10 @@ public final class DeployTool {
       }
     } catch (software.amazon.awssdk.services.dynamodb.model.ResourceNotFoundException e) {
       throw new IllegalStateException(
-          "table " + tableName + " not found (run `make deploy-floci` first)");
+          "table " + tableName + " not found (run `just deploy-floci` first)");
     }
     if (count == 0) {
-      System.out.println("no site state yet (send a check first: make send URL=...)");
+      System.out.println("no site state yet (send a check first: just send <url>)");
     }
   }
 
@@ -358,7 +358,7 @@ public final class DeployTool {
     Path path = Path.of(env("FUNCTION_ZIP", DEFAULT_FUNCTION_ZIP));
     if (!Files.exists(path)) {
       throw new IllegalStateException(
-          "function zip not found at " + path + " (run `make build` first, or set FUNCTION_ZIP)");
+          "function zip not found at " + path + " (run `just build` first, or set FUNCTION_ZIP)");
     }
     return path;
   }

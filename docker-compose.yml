@@ -1,6 +1,6 @@
 # Two interchangeable emulators for the LocalStack API on :4566. Only one can
-# run at a time (shared host port) — use `make deploy-floci` or
-# `make deploy-localstack` rather than a bare `docker compose up`.
+# run at a time (shared host port) — use `just deploy-floci` or
+# `just deploy-localstack` rather than a bare `docker compose up`.
 #
 # The docker.sock mounts aren't needed for DynamoDB, but both emulators run
 # Lambdas as sibling containers, and the experiment/floci-java worktree deploys
