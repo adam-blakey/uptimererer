@@ -48,16 +48,19 @@ public record StateRecord(
       return this;
     }
 
+    @SuppressWarnings("unused")
     public Builder lastCheckedAt(Instant lastCheckedAt) {
       this.lastCheckedAt = lastCheckedAt;
       return this;
     }
 
+    @SuppressWarnings("unused")
     public Builder statusCode(int statusCode) {
       this.statusCode = statusCode;
       return this;
     }
 
+    @SuppressWarnings("unused")
     public Builder ok(boolean ok) {
       this.ok = ok;
       return this;
