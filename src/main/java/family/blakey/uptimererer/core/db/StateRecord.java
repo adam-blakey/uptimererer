@@ -11,7 +11,8 @@ import software.amazon.awssdk.services.dynamodb.model.KeySchemaElement;
 import software.amazon.awssdk.services.dynamodb.model.KeyType;
 
 @DynamoDbImmutable(builder = StateRecord.Builder.class)
-public record StateRecord(@DynamoDbPartitionKey String websiteId, Instant lastCheckedAt) {
+public record StateRecord(
+    @DynamoDbPartitionKey String websiteId, Instant lastCheckedAt, int statusCode, boolean ok) {
 
   public static final TableSchema<StateRecord> TABLE_SCHEMA =
       TableSchema.fromClass(StateRecord.class);
@@ -38,6 +39,8 @@ public record StateRecord(@DynamoDbPartitionKey String websiteId, Instant lastCh
   public static final class Builder {
     private String websiteId;
     private Instant lastCheckedAt;
+    private int statusCode;
+    private boolean ok;
 
     @SuppressWarnings("unused")
     public Builder websiteId(String websiteId) {
@@ -50,9 +53,19 @@ public record StateRecord(@DynamoDbPartitionKey String websiteId, Instant lastCh
       return this;
     }
 
+    public Builder statusCode(int statusCode) {
+      this.statusCode = statusCode;
+      return this;
+    }
+
+    public Builder ok(boolean ok) {
+      this.ok = ok;
+      return this;
+    }
+
     @SuppressWarnings("unused")
     public StateRecord build() {
-      return new StateRecord(websiteId, lastCheckedAt);
+      return new StateRecord(websiteId, lastCheckedAt, statusCode, ok);
     }
   }
 }

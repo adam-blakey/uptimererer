@@ -7,6 +7,8 @@ import com.amazonaws.services.lambda.runtime.events.SQSEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import family.blakey.uptimererer.core.db.StateRecord;
 import family.blakey.uptimererer.core.db.StateRepository;
+import family.blakey.uptimererer.core.models.Poll;
+import family.blakey.uptimererer.core.models.Website;
 import jakarta.inject.Inject;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -46,7 +48,12 @@ public class CheckerererHandler implements RequestHandler<SQSEvent, SQSBatchResp
   }
 
   private void checkAndRecord(Request request) {
-    // TODO: actually make the request.
-    repository.put(new StateRecord(request.url(), Instant.now()));
+    Website website = Website.from(request);
+    website.validate();
+
+    Poll.Result result = Poll.check(website);
+    repository.put(
+        new StateRecord(
+            request.url(), Instant.now(), result.httpStatus(), result.statusExpected()));
   }
 }
