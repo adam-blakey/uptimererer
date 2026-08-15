@@ -1,12 +1,10 @@
+[private]
 default:
     @just --list
 
 deploy-floci: emulator-floci deploy
 
 deploy-localstack: emulator-localstack deploy
-
-deploy:
-    ./mvnw -q package -DskipTests exec:java -Dexec.args="deploy"
 
 # Queue a check request for url, e.g. just send https://example.com
 send url:
@@ -20,26 +18,37 @@ dev-floci: emulator-floci dev
 
 dev-localstack: emulator-localstack dev
 
-dev:
-    ./mvnw quarkus:dev
-
 build:
     ./mvnw -q package -DskipTests
 
-emulator-floci: (_ensure-emulator "floci")
-
-emulator-localstack: (_ensure-emulator "localstack")
-
 local-down:
     docker compose down
+
+format:
+    ./mvnw spotless:apply
 
 # Tests talk to DynamoDB on :4566, so an emulator must be up (e.g., just emulator-floci).
 test:
     ./mvnw test
 
+[private]
+deploy:
+    ./mvnw -q package -DskipTests exec:java -Dexec.args="deploy"
+
+[private]
+dev:
+    ./mvnw quarkus:dev
+
+[private]
+emulator-floci: (_ensure-emulator "floci")
+
+[private]
+emulator-localstack: (_ensure-emulator "localstack")
+
 # Ensures the emulator service `service` is the one serving :4566: reuses a running
 # container with a matching image (however it was started), otherwise stops
 # whatever holds the port and starts `service` from docker-compose.yml.
+[private]
 _ensure-emulator service:
     #!/usr/bin/env bash
     set -euo pipefail
